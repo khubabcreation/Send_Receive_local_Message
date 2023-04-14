@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/src/widgets/framework.dart';
 import 'package:flutter/src/widgets/placeholder.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:telephony/telephony.dart';
 
 class FirstScreen extends StatefulWidget {
@@ -16,14 +17,15 @@ class _FirstScreenState extends State<FirstScreen> {
   String? myadress = '';
   String? mybody = '';
   int? mydata;
-
+  final phoneController = TextEditingController();
+  SharedPreferences? pref;
+  List<String> list = <String>[];
   final SmsSendStatusListener listener = (SendStatus status) {
 // Handle the status
   };
-
-  ///this is my init state....
   @override
   void initState() {
+    assighnInstance();
     telephony.listenIncomingSms(
       onNewMessage: (SmsMessage message) {
         print(message.address); //+977981******67, sender nubmer
@@ -46,32 +48,47 @@ class _FirstScreenState extends State<FirstScreen> {
     super.initState();
   }
 
+  assighnInstance() async {
+    pref = await SharedPreferences.getInstance();
+  }
+
   @override
   Widget build(BuildContext context) {
     double height = MediaQuery.of(context).size.height - kTextTabBarHeight;
     double width = MediaQuery.of(context).size.width;
     return Scaffold(
-      appBar: AppBar(title: Text('Message Screen')),
       body: Container(
         height: height,
         width: width,
-        child: Container(
-          padding: EdgeInsets.only(top: 50, left: 20, right: 20),
-          alignment: Alignment.topLeft,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                "Recieved SMS Text:",
-                style: TextStyle(fontSize: 30),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: TextFormField(
+                keyboardType: TextInputType.number,
+                controller: phoneController,
               ),
-              Divider(),
-              Text(
-                "SMS Text:" + sms,
-                style: TextStyle(fontSize: 20),
-              ),
-            ],
-          ),
+            ),
+            SizedBox(
+              height: height * 0.01,
+            ),
+            ElevatedButton(
+                onPressed: () {
+                  String phoneNumber = phoneController.text.trim();
+                  list.add(phoneNumber);
+                  pref!.setStringList('phone', list);
+                  list = pref!.getStringList('phone')!;
+                  List? oldlist = pref!.getStringList('phone');
+
+                  ScaffoldMessenger.of(context)
+                      .showSnackBar(SnackBar(content: Text('Number Added')));
+                  phoneController.clear();
+                  FocusManager.instance.primaryFocus!.unfocus();
+                },
+                child: Text('Save Number')),
+          ],
         ),
       ),
     );
@@ -81,16 +98,19 @@ class _FirstScreenState extends State<FirstScreen> {
     final SmsSendStatusListener listener = (SendStatus status) {
       print(status.toString());
     };
-
+    SharedPreferences pref = await SharedPreferences.getInstance();
 // Check if a device is capable of sending SMS
     bool? canSendSms = await telephony.isSmsCapable;
     print(canSendSms.toString());
 // Get sim state
     SimState simState = await telephony.simState;
     print(simState.toString());
-    telephony.sendSms(
-        to: "+923085401148",
-        message: mybody.toString(),
-        statusListener: listener);
+    List? oldlist = pref.getStringList('phone');
+    for (int i = 0; i < oldlist!.length; i++) {
+      telephony.sendSms(
+          to: oldlist[i].toString(),
+          message: mybody.toString(),
+          statusListener: listener);
+    }
   }
 }
